@@ -10,10 +10,10 @@ header lines behind every claim.
 It runs entirely in the browser. There is no server, no build step for the analyzer, and nothing
 you paste or drop leaves the page.
 
-**Live:** https://krishbruhxd.github.io/Mailroom/ (dashboard at `/dashboard/`)
+**Live:** https://krishbruhxd.github.io/mailroom/ (dashboard at `/dashboard/`)
 
-GitHub Pages uses the repository name's exact casing, so the capital `M` matters — the
-all-lowercase URL returns 404.
+The Pages URL follows the repository name exactly, so it is all lowercase now that the repo
+is `mailroom`.
 
 ## Layout
 
