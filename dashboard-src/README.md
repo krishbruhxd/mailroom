@@ -30,18 +30,18 @@ npm run preview
 
 ## Publish it
 
-`vite.config.js` already sets `base: "./"`, which is the part people usually get wrong on
-GitHub Pages.
+This lives inside the main `mailroom` repository. GitHub Pages serves the repository root, so
+the built app is copied into the sibling `dashboard/` folder rather than published on its own.
 
-1. Run `npm run build`. This creates a `dist/` folder.
-2. Create a repository on GitHub, for example `mailroom-dashboard`.
-3. Upload the **contents of `dist/`** (not the folder itself) to the repository root and push.
-4. Settings → Pages → source `Deploy from a branch`, branch `main`, folder `/ (root)`, save.
-5. The site appears at `https://<your-username>.github.io/mailroom-dashboard/`.
+`vite.config.js` sets `base: "./"`, which is the part people usually get wrong in a subfolder.
 
-If you would rather not build locally, use the
-[GitHub Actions starter workflow for Vite](https://vite.dev/guide/static-deploy.html); it
-builds on every push and publishes `dist/` for you.
+```bash
+npm run build
+xcopy /E /Y dist\* ..\dashboard\
+```
+
+Commit `dashboard/`, `dashboard-src/` and `index.html` together so the live site and the source
+never drift apart. Live at `https://krishbruhxd.github.io/mailroom/dashboard/`.
 
 ## What is real and what is demo
 

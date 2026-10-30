@@ -1,29 +1,51 @@
 # Mailroom
 
-A header analyzer for suspicious email. Paste the raw headers from a message — or drop in the
-`.eml` file your mail client saved — and it shows what the message says about where it came
-from: the address you see, the address bounces return to, who vouched for the sender, and the
-route it travelled — quoting the exact header lines behind every claim.
+A header analyzer for suspicious email, plus a diagnostics dashboard built on the same checks.
 
-It runs entirely in the browser. There is no server, no build step, and nothing you paste or
-drop leaves the page.
+Paste the raw headers from a message — or drop in the `.eml` file your mail client saved — and
+it shows what the message says about where it came from: the address you see, the address
+bounces return to, who vouched for the sender, and the route it travelled — quoting the exact
+header lines behind every claim.
+
+It runs entirely in the browser. There is no server, no build step for the analyzer, and nothing
+you paste or drop leaves the page.
+
+**Live:** https://krishbruhxd.github.io/mailroom/ (dashboard at `/dashboard/`)
+
+## Layout
+
+```
+index.html          the analyzer — one file, no dependencies
+dashboard/          the dashboard, pre-built for GitHub Pages
+dashboard-src/      the dashboard source (React 19 + Vite 7 + Tailwind 4)
+```
 
 ## Run it
 
-Open `index.html` in a browser. That's the whole setup.
+Analyzer: open `index.html` in a browser. That's the whole setup.
+
+Dashboard:
+
+```bash
+cd dashboard-src
+npm install
+npm run dev
+```
+
+Rebuild it after changes, then copy `dashboard-src/dist/*` into `dashboard/`:
+
+```bash
+cd dashboard-src
+npm run build
+```
 
 Files are read locally with the browser's File API, and the body is discarded at the first
 blank line, so only the header block is ever held in the page.
 
 ## Publish it
 
-1. Create a repository on GitHub called `mailroom`.
-2. Put `index.html` in the root and push.
-3. In the repository, go to Settings → Pages, set the source to `Deploy from a branch`,
-   branch `main`, folder `/ (root)`, and save.
-4. The site appears at `https://<your-username>.github.io/mailroom/` in a minute or two.
-
-Put that URL on your CV next to the project line.
+Pages serves `main` from the repository root, so `dashboard/` is already in place — no build
+step on the server. After changing the dashboard source, rebuild and commit both folders.
 
 ## What it checks
 
