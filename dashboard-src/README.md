@@ -41,7 +41,7 @@ xcopy /E /Y dist\* ..\dashboard\
 ```
 
 Commit `dashboard/`, `dashboard-src/` and `index.html` together so the live site and the source
-never drift apart. Live at `https://krishbruhxd.github.io/mailroom/dashboard/`.
+never drift apart. Live at `https://krishbruhxd.github.io/Mailroom/dashboard/`.
 
 ## What is real and what is demo
 
