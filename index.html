@@ -1,0 +1,1921 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mailroom — header diagnostics for one email</title>
+<meta name="description" content="Paste a message's raw headers and see who it really came from. Compares the letterhead against the envelope and quotes every line it read. Runs entirely in your browser.">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f4f4f5'/%3E%3Crect x='7' y='10' width='18' height='13' rx='2' fill='none' stroke='%230a0a0b' stroke-width='1.8'/%3E%3Cpath d='m7.8 11 8.2 5.6L24.2 11' fill='none' stroke='%230a0a0b' stroke-width='1.8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ---------- tokens ---------- */
+  :root{
+    --bg:#0a0a0b;
+    --card:#111113;
+    --raise:#161619;
+    --ink:#f4f4f5;
+    --ink-2:#d4d4d8;
+    --muted:#a1a1aa;
+    --faint:#8b8b93;
+    --line:#26262a;
+    --line-2:#3f3f46;
+    --line-3:#1e1e22;
+
+    --ok:#34d399;
+    --ok-bg:rgba(16,185,129,.10);
+    --ok-line:rgba(52,211,153,.28);
+
+    --warn:#fbbf24;
+    --warn-bg:rgba(245,158,11,.10);
+    --warn-line:rgba(251,191,36,.28);
+
+    --bad:#f87171;
+    --bad-bg:rgba(239,68,68,.10);
+    --bad-line:rgba(248,113,113,.30);
+
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+
+    --radius:10px;
+    --shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;color-scheme:dark}
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{
+      animation-duration:.001ms!important;
+      animation-delay:0s!important;
+      transition-duration:.001ms!important;
+    }
+  }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  :focus-visible{outline:2px solid rgba(244,244,245,.55);outline-offset:2px;border-radius:2px}
+  ::selection{background:#3f3f46;color:#fafafa}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+  .skip{
+    position:absolute;left:-9999px;top:0;z-index:60;
+    background:var(--ink);color:var(--bg);padding:10px 16px;
+    font-size:13px;text-decoration:none;border-radius:0 0 8px 0;
+  }
+  .skip:focus{left:0;top:0}
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    position:sticky;top:0;z-index:30;
+    background:rgba(10,10,11,.82);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .masthead-in{
+    max-width:1120px;margin:0 auto;height:56px;padding:0 20px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .brand{
+    display:inline-flex;align-items:center;gap:9px;
+    color:var(--ink);text-decoration:none;
+    font-size:15px;font-weight:600;letter-spacing:-.01em;
+  }
+  .brand-mark{
+    display:grid;place-items:center;
+    width:26px;height:26px;border-radius:7px;
+    background:var(--ink);color:var(--bg);
+    box-shadow:0 1px 2px rgba(0,0,0,.6);
+  }
+  .brand-mark svg{width:15px;height:15px}
+  .brand-sub{
+    color:var(--faint);font-size:11.5px;font-weight:400;
+    padding-left:9px;border-left:1px solid var(--line);
+  }
+  .mast-nav{
+    margin-left:auto;display:flex;align-items:center;gap:14px;
+    font-size:12.5px;
+  }
+  .mast-nav a{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:1px}
+  .mast-nav a:hover{color:var(--ink);border-bottom-color:var(--line-2)}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:3px 8px;border-radius:999px;
+    border:1px solid var(--line);background:var(--raise);
+    color:var(--muted);font-size:10.5px;white-space:nowrap;
+  }
+  .chip::before{
+    content:"";width:5px;height:5px;border-radius:50%;
+    background:#34d399;box-shadow:0 0 0 3px rgba(52,211,153,.16);
+  }
+  @media (max-width:600px){
+    .brand-sub{display:none}
+    .mast-nav a{display:none}
+  }
+
+  /* ---------- intro ---------- */
+  .intro{padding:clamp(30px,4.6vw,46px) 0 0}
+  .intro h1{
+    margin:0;max-width:30ch;
+    font-size:clamp(1.6rem,3.5vw,2.1rem);
+    line-height:1.14;letter-spacing:-.024em;font-weight:600;
+    text-wrap:balance;
+  }
+  .intro p{
+    margin:13px 0 0;max-width:64ch;
+    color:var(--muted);font-size:15px;
+  }
+  .intro code{
+    font-family:var(--mono);font-size:.86em;
+    padding:1px 5px;border-radius:4px;
+    border:1px solid var(--line);
+    background:var(--raise);color:var(--ink-2);
+  }
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+
+  /* ---------- intake ---------- */
+  .intake{margin-top:20px;padding:14px 16px 0;position:relative}
+  .lbl{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:12px;flex-wrap:wrap;margin-bottom:8px;
+  }
+  .k{
+    font-size:11px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .lbl-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px}
+  #headers{
+    display:block;width:100%;min-height:176px;resize:vertical;
+    background:#0d0d0f;border:1px solid var(--line-2);border-radius:8px;
+    padding:12px 14px;color:var(--ink-2);
+    font-family:var(--mono);font-size:12.5px;line-height:1.7;
+    tab-size:8;
+  }
+  #headers::placeholder{color:#85858d}
+  #headers:focus{
+    outline:none;border-color:#52525b;
+    box-shadow:0 0 0 3px rgba(244,244,245,.07);
+  }
+  .actions{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px 14px;flex-wrap:wrap;
+    margin-top:12px;padding-bottom:14px;
+  }
+  .action-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .privacy{margin:0;color:var(--faint);font-size:11.5px}
+  .loaded{
+    display:flex;align-items:center;gap:7px;
+    margin:9px 0 0;font-size:11.5px;line-height:1.5;color:var(--muted);
+  }
+  .loaded[hidden]{display:none}
+  .loaded::before{
+    content:"";width:5px;height:5px;border-radius:50%;
+    background:var(--ok);flex:none;
+  }
+  .loaded b{font-family:var(--mono);font-weight:400;color:var(--ink-2)}
+
+  /* Drop target appears only while files are dragged over the window. */
+  .drop{
+    position:absolute;inset:8px;z-index:6;
+    display:none;place-items:center;text-align:center;
+    padding:22px;border-radius:8px;
+    border:1px dashed var(--line-2);
+    background:rgba(10,10,11,.94);
+    backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    pointer-events:none;
+  }
+  .intake.is-dragging .drop{display:grid}
+  .drop-in{display:grid;justify-items:center;gap:2px}
+  .drop svg{width:26px;height:26px;color:var(--muted);margin-bottom:9px}
+  .drop-title{margin:0;font-size:14px;font-weight:500;color:var(--ink)}
+  .drop-note{margin:0;font-size:12px;color:var(--muted)}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;
+    font:inherit;font-size:13px;font-weight:500;line-height:1;
+    padding:9px 14px;border-radius:7px;
+    border:1px solid transparent;cursor:pointer;text-decoration:none;
+    transition:background-color .15s ease,border-color .15s ease,color .15s ease;
+  }
+  .btn svg{width:14px;height:14px;flex:none;color:var(--muted)}
+  .btn--primary svg{color:currentColor}
+  .btn--primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+  .btn--primary:hover{background:#d4d4d8;border-color:#d4d4d8}
+  .btn--ghost{background:var(--raise);border-color:var(--line-2);color:var(--ink-2)}
+  .btn--ghost:hover{background:#1d1d21;border-color:#52525b}
+  .btn--sm{padding:5px 9px;font-size:11.5px;border-radius:6px}
+  .kbd{
+    margin-left:3px;padding:2px 4px;border-radius:4px;
+    border:1px solid rgba(10,10,11,.22);background:rgba(10,10,11,.06);
+    font-family:var(--mono);font-size:9.5px;line-height:1.2;
+    color:rgba(10,10,11,.72);
+  }
+  .sample{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:3px 8px;border-radius:999px;
+    border:1px solid var(--line);background:var(--raise);
+    font:inherit;font-size:11.5px;color:var(--muted);
+    cursor:pointer;
+    transition:border-color .15s ease,color .15s ease,background-color .15s ease;
+  }
+  .sample:hover{color:var(--ink);border-color:var(--line-2);background:#1b1b1f}
+  .sample-dot{width:5px;height:5px;border-radius:50%;flex:none}
+  .sample-dot[data-tone="fail"]{background:#f87171}
+  .sample-dot[data-tone="pass"]{background:#34d399}
+
+  .field-error{
+    margin:0 0 14px;padding:10px 12px;
+    border:1px solid var(--bad-line);background:var(--bad-bg);
+    border-radius:7px;color:#fca5a5;font-size:12.5px;line-height:1.55;
+  }
+  .field-error[hidden]{display:none}
+
+  .how{border-top:1px solid var(--line);padding:11px 0 13px;scroll-margin-top:72px}
+  .how summary{
+    cursor:pointer;font-size:12.5px;color:var(--muted);
+    list-style:none;display:flex;align-items:center;gap:7px;
+  }
+  .how summary::-webkit-details-marker{display:none}
+  .how summary::before{
+    content:"";width:0;height:0;
+    border-left:4px solid currentColor;border-top:3.5px solid transparent;
+    border-bottom:3.5px solid transparent;transition:transform .15s ease;
+  }
+  .how[open] summary::before{transform:rotate(90deg)}
+  .how summary:hover{color:var(--ink)}
+  .how dl{
+    display:grid;grid-template-columns:max-content minmax(0,1fr);
+    gap:8px 18px;margin:12px 0 2px;
+    font-size:12.5px;line-height:1.6;
+  }
+  .how dt{color:var(--ink);font-weight:500}
+  .how dd{margin:0;color:var(--muted)}
+  .how em{font-style:normal;color:var(--ink);border-bottom:1px solid var(--line-2)}
+  @media (max-width:560px){
+    .how dl{grid-template-columns:1fr;gap:2px 0}
+    .how dd{margin-bottom:9px}
+  }
+
+  /* ---------- report ---------- */
+  .report{margin-top:20px;display:grid;gap:12px;scroll-margin-top:72px}
+  .report[hidden]{display:none}
+  .report--in{animation:report-in .32s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes report-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes finding-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .findings .finding{
+    animation:finding-in .3s cubic-bezier(.2,.7,.3,1) both;
+    animation-delay:calc(var(--i,0) * 38ms);
+  }
+
+  .verdict{padding:15px 16px 16px;position:relative;overflow:hidden}
+  .verdict::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+    background:transparent;
+  }
+  .verdict[data-state="fail"]::before{background:var(--bad)}
+  .verdict[data-state="check"]::before{background:var(--warn)}
+  .verdict[data-state="pass"]::before{background:var(--ok)}
+  .verdict-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:3px 9px;border-radius:999px;
+    font-size:11px;font-weight:500;letter-spacing:.01em;
+    border:1px solid var(--line);
+  }
+  .pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.75}
+  .pill[data-state="fail"]{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad)}
+  .pill[data-state="check"]{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+  .pill[data-state="pass"]{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+  .verdict-meta{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .verdict h2{
+    margin:9px 0 0;font-size:17px;line-height:1.35;
+    letter-spacing:-.012em;font-weight:600;color:var(--ink);
+  }
+  .verdict h2:focus{outline:none}
+  .verdict p{
+    margin:6px 0 0;max-width:74ch;
+    color:var(--muted);font-size:13.5px;line-height:1.65;
+  }
+  .verdict-counts{
+    display:flex;flex-wrap:wrap;gap:6px 14px;
+    margin-top:11px;padding-top:9px;
+    border-top:1px solid var(--line-3);
+    font-size:11.5px;color:var(--muted);
+  }
+  .verdict-counts:empty{display:none}
+  .vc{display:inline-flex;align-items:center;gap:6px}
+  .vc::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--faint);flex:none}
+  .vc[data-state="fail"]::before{background:#f87171}
+  .vc[data-state="check"]::before{background:#fbbf24}
+  .vc[data-state="pass"]::before{background:#34d399}
+  .vc b{font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  /* ---------- identity ---------- */
+  .identity{padding:0;overflow:hidden}
+  .id-grid{display:grid;grid-template-columns:1fr 1fr;position:relative}
+  .id-col{padding:14px 16px}
+  .id-col + .id-col{border-left:1px solid var(--line)}
+  .id-key{
+    display:block;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  }
+  .id-addr{
+    margin-top:6px;font-family:var(--mono);font-size:13px;
+    color:var(--ink);word-break:break-word;line-height:1.5;
+  }
+  .id-note{margin:5px 0 0;font-size:11.5px;color:var(--muted)}
+  .id-bridge{
+    position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:1;
+    display:grid;place-items:center;
+    width:24px;height:24px;border-radius:999px;
+    background:var(--raise);border:1px solid var(--line);
+    font-family:var(--mono);font-size:12px;line-height:1;
+    color:var(--muted);
+  }
+  .id-bridge[data-state="fail"]{border-color:var(--bad-line);color:var(--bad)}
+  .id-bridge[data-state="pass"]{border-color:var(--ok-line);color:var(--ok)}
+  .id-bridge[data-state="check"]{border-color:var(--warn-line);color:var(--warn)}
+  .id-sum{
+    margin:0;padding:10px 16px;
+    border-top:1px solid var(--line);background:#0d0d0f;
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+    font-size:12px;color:var(--muted);
+  }
+  .id-sum b{font-weight:500;color:var(--ink)}
+  .id-extra{
+    display:flex;flex-wrap:wrap;gap:6px 16px;
+    margin-top:10px;padding-top:10px;
+    border-top:1px solid var(--line-3);
+    font-size:11.5px;color:var(--muted);
+  }
+  .id-extra code{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+  @media (max-width:640px){
+    .id-grid{grid-template-columns:1fr}
+    .id-col + .id-col{border-left:none;border-top:1px solid var(--line)}
+    .id-bridge{display:none}
+  }
+
+  /* ---------- split ---------- */
+  .split{display:grid;gap:12px}
+  @media (min-width:1000px){
+    .split{grid-template-columns:minmax(0,1fr) 320px;align-items:start}
+  }
+  .aside{display:grid;gap:12px;min-width:0}
+
+  .findings{padding:14px 16px 16px}
+  .sec-head{
+    display:flex;align-items:baseline;justify-content:space-between;
+    gap:12px;flex-wrap:wrap;
+  }
+  .sec-head h2,.side h2{
+    margin:0;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  }
+  .sec-note{font-size:11px;color:var(--muted);line-height:1.5}
+
+  .checks{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+  .finding{
+    border:1px solid var(--line);border-radius:8px;
+    padding:11px 12px 12px;background:var(--raise);
+    transition:border-color .15s ease;
+  }
+  .finding:hover{border-color:var(--line-2)}
+  .finding-head{display:flex;align-items:flex-start;gap:8px}
+  .dot{
+    width:7px;height:7px;border-radius:999px;
+    margin-top:6px;flex:none;
+  }
+  .finding[data-state="fail"] .dot{background:#f87171}
+  .finding[data-state="check"] .dot{background:#fbbf24}
+  .finding[data-state="pass"] .dot{background:#34d399}
+  .finding h3{
+    margin:0;flex:1;min-width:0;
+    font-size:13.5px;font-weight:600;line-height:1.45;color:var(--ink);
+  }
+  .tag{
+    flex:none;margin-top:1px;
+    padding:2px 6px;border-radius:4px;
+    font-size:9.5px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;border:1px solid;
+  }
+  .finding[data-state="fail"] .tag{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad)}
+  .finding[data-state="check"] .tag{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+  .finding[data-state="pass"] .tag{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+  .finding-why{
+    margin:6px 0 0;max-width:72ch;
+    font-size:12.5px;line-height:1.6;color:var(--muted);
+  }
+
+  .ev{margin-top:9px;padding-top:8px;border-top:1px solid var(--line-3)}
+  .ev summary{
+    cursor:pointer;list-style:none;
+    display:flex;align-items:center;gap:6px;
+    font-size:11.5px;color:var(--muted);
+  }
+  .ev summary::-webkit-details-marker{display:none}
+  .ev summary::before{
+    content:"";width:0;height:0;
+    border-left:4px solid currentColor;border-top:3.5px solid transparent;
+    border-bottom:3.5px solid transparent;transition:transform .15s ease;
+  }
+  .ev[open] summary::before{transform:rotate(90deg)}
+  .ev summary:hover{color:var(--ink)}
+  .ev pre{
+    margin:5px 0 0;padding:8px 10px;
+    background:#0c0c0e;border:1px solid var(--line-3);border-radius:6px;
+    font-family:var(--mono);font-size:11.5px;line-height:1.65;
+    color:var(--ink-2);white-space:pre;overflow-x:auto;
+  }
+  .ev pre + pre{margin-top:6px}
+  .ev-k{color:var(--ink);font-weight:500}
+
+  /* ---------- signals ---------- */
+  .side{padding:13px 14px 14px}
+  .sigs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .sig{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 7px;border-radius:6px;
+    border:1px solid var(--line);background:var(--raise);
+    font-size:11px;color:var(--ink-2);
+  }
+  .sig i{
+    font-style:normal;font-family:var(--mono);
+    font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--faint);
+  }
+  .sig b{font-weight:500;font-size:11px}
+  .sig::before{
+    content:"";width:5px;height:5px;border-radius:50%;flex:none;
+    background:#52525b;
+  }
+  .sig[data-state="pass"]::before{background:#34d399}
+  .sig[data-state="check"]::before{background:#fbbf24}
+  .sig[data-state="fail"]::before{background:#f87171}
+  .sig[data-tone="pass"] b{color:var(--ok)}
+  .sig[data-tone="check"] b{color:var(--warn)}
+  .sig[data-tone="fail"] b{color:var(--bad)}
+  .sig[data-tone="none"] b{color:var(--muted)}
+
+  /* ---------- route ---------- */
+  #route[hidden]{display:none}
+  .hops{list-style:none;margin:12px 0 0;padding:0}
+  .hop{position:relative;padding:0 0 14px 28px}
+  .hop:last-child{padding-bottom:0}
+  .hop::before{
+    content:"";position:absolute;left:8.5px;top:19px;bottom:-1px;
+    width:1px;background:var(--line);
+  }
+  .hop:last-child::before{display:none}
+  .hop-n{
+    position:absolute;left:0;top:0;
+    display:grid;place-items:center;
+    width:18px;height:18px;border-radius:999px;
+    background:var(--raise);border:1px solid var(--line-2);
+    font-family:var(--mono);font-size:9px;color:var(--muted);
+  }
+  .hop-line{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .hop-host{
+    font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    word-break:break-word;line-height:1.5;
+  }
+  .hop-delta{
+    flex:none;font-family:var(--mono);font-size:10px;color:var(--faint);
+  }
+  .hop-meta{margin:2px 0 0;font-size:11px;line-height:1.5;color:var(--muted)}
+
+  /* ---------- raw headers ---------- */
+  .raw{margin-top:0;overflow:hidden}
+  .raw > summary{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:12px 16px;cursor:pointer;list-style:none;
+    font-size:12.5px;color:var(--muted);
+  }
+  .raw > summary::-webkit-details-marker{display:none}
+  .raw > summary:hover{color:var(--ink)}
+  .raw-count{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:6px}
+  .raw-tools{display:flex;align-items:center;gap:8px}
+  .raw-body{
+    border-top:1px solid var(--line);
+    max-height:520px;overflow:auto;
+  }
+  .raw-line{display:flex;align-items:flex-start}
+  .raw-line:hover{background:#17171a}
+  .raw-n{
+    flex:none;width:44px;padding:0 10px 0 0;
+    text-align:right;
+    font-family:var(--mono);font-size:10px;line-height:1.8;
+    color:#74747c;user-select:none;
+  }
+  .raw-t{
+    padding:0 18px 0 0;
+    font-family:var(--mono);font-size:11.5px;line-height:1.8;
+    color:var(--muted);white-space:pre;
+  }
+  .raw-k{color:var(--ink);font-weight:500}
+  .raw-c{color:#8b8b93}
+  .raw-t .hl[data-tone="pass"]{color:var(--ok);font-weight:500}
+  .raw-t .hl[data-tone="fail"]{color:var(--bad);font-weight:500}
+  .raw-t .hl[data-tone="check"]{color:var(--warn);font-weight:500}
+
+  /* ---------- footer ---------- */
+  .foot{margin-top:34px;border-top:1px solid var(--line);background:#0c0c0e}
+  .foot-in{
+    display:grid;grid-template-columns:minmax(0,1fr) 300px;
+    gap:24px 40px;padding-top:22px;padding-bottom:28px;
+  }
+  .limits h2{
+    margin:0 0 8px;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  }
+  .limits ul{
+    margin:0;padding-left:18px;
+    font-size:12.5px;line-height:1.65;color:var(--muted);
+    max-width:70ch;
+  }
+  .limits li + li{margin-top:6px}
+  .colophon{font-size:11.5px;line-height:1.65;color:var(--muted)}
+  .colophon p{margin:0}
+  .colophon p + p{margin-top:8px}
+  .colophon a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:2px}
+  .colophon a:hover{text-decoration-color:var(--faint)}
+  @media (max-width:760px){
+    .foot-in{grid-template-columns:1fr;gap:18px;padding-bottom:24px}
+  }
+
+  @media (max-width:560px){
+    .wrap{padding:0 14px}
+    .masthead-in{padding:0 14px}
+    .intake{padding:12px 12px 0}
+    .findings,.verdict{padding-left:12px;padding-right:12px}
+    .actions{justify-content:flex-start}
+    .privacy{order:2;flex-basis:100%}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the tool</a>
+
+<header class="masthead">
+  <div class="masthead-in">
+    <a class="brand" href="./">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5.5" width="18" height="13" rx="2"></rect>
+          <path d="m3.8 7 8.2 5.6L20.2 7"></path>
+        </svg>
+      </span>
+      Mailroom
+    </a>
+    <span class="brand-sub">Single message</span>
+
+    <nav class="mast-nav" aria-label="Page">
+      <a href="#how">Finding the headers</a>
+      <span class="chip">Runs locally</span>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+
+    <section class="intro">
+      <h1>Two return addresses. Nothing forces them to agree.</h1>
+      <p>
+        Paste the raw headers from a message you don't trust, or drop in the <code>.eml</code> file
+        your mail client saved. Mailroom compares the address you see against the envelope the
+        servers actually used, reads who vouched for the sender, and quotes every line it looked
+        at — so you can check its work.
+      </p>
+    </section>
+
+    <section class="card intake" aria-labelledby="intake-title">
+      <form id="intake-form" novalidate>
+        <div class="lbl">
+          <label class="k" id="intake-title" for="headers">Message headers</label>
+          <div class="lbl-tools">
+            <button class="sample" type="button" data-sample="suspicious">
+              <span class="sample-dot" data-tone="fail" aria-hidden="true"></span>Failing example
+            </button>
+            <button class="sample" type="button" data-sample="clean">
+              <span class="sample-dot" data-tone="pass" aria-hidden="true"></span>Clean example
+            </button>
+          </div>
+        </div>
+
+        <textarea
+          id="headers"
+          name="headers"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          aria-describedby="privacy form-error loaded"></textarea>
+
+        <p class="loaded" id="loaded" role="status" hidden></p>
+
+        <div class="actions">
+          <div class="action-btns">
+            <button class="btn btn--primary" type="submit">
+              Inspect headers
+              <kbd class="kbd" id="run-key">Ctrl</kbd><kbd class="kbd">&#8629;</kbd>
+            </button>
+            <button class="btn btn--ghost" type="button" id="eml-open">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"></path>
+                <path d="M14 3v5h5"></path>
+              </svg>
+              Open .eml
+            </button>
+            <input
+              class="sr-only"
+              type="file"
+              id="eml-file"
+              accept=".eml,.txt,message/rfc822,text/plain"
+              tabindex="-1"
+              aria-hidden="true" />
+          </div>
+          <p class="privacy" id="privacy">Runs in this tab. Nothing you paste or drop is uploaded.</p>
+        </div>
+
+        <p class="field-error" id="form-error" role="alert" hidden></p>
+      </form>
+
+      <details class="how" id="how">
+        <summary>Where to find the headers</summary>
+        <dl>
+          <dt>Gmail, on the web</dt>
+          <dd>Open the message, click the three dots next to Reply, choose <em>Show original</em>, then <em>Copy to clipboard</em>.</dd>
+          <dt>Outlook on Windows</dt>
+          <dd>Open the message and go to File, then Properties. The full list is under <em>Internet headers</em>.</dd>
+          <dt>Apple Mail</dt>
+          <dd>With the message open, choose View, then Message, then <em>Raw Source</em>.</dd>
+          <dt>The whole message, as a file</dt>
+          <dd>Gmail: <em>Show original</em>, then <em>Download original</em>. Apple Mail: File then Save As. Thunderbird: Ctrl+S. The file ends in <em>.eml</em> — drop it anywhere on this card. Outlook's <em>.msg</em> files are a different format, so copy its headers instead.</dd>
+        </dl>
+      </details>
+
+      <div class="drop" aria-hidden="true">
+        <div class="drop-in">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.5v11"></path>
+            <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+            <path d="M4 16.5v2A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5v-2"></path>
+          </svg>
+          <p class="drop-title">Drop the .eml file</p>
+          <p class="drop-note">Headers only — the body is never read, and nothing is uploaded.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="report" id="report" hidden>
+
+      <div class="card verdict" id="verdict">
+        <div class="verdict-top">
+          <span class="pill" id="verdict-pill"></span>
+          <span class="verdict-meta" id="verdict-meta"></span>
+        </div>
+        <h2 id="verdict-title" tabindex="-1"></h2>
+        <p id="verdict-text"></p>
+        <div class="verdict-counts" id="verdict-counts"></div>
+      </div>
+
+      <div class="card identity">
+        <div class="id-grid" id="identity"></div>
+        <p class="id-sum" id="id-sum"></p>
+      </div>
+
+      <div class="split">
+        <section class="card findings" aria-labelledby="findings-title">
+          <div class="sec-head">
+            <h2 id="findings-title">What Mailroom checked</h2>
+            <span class="sec-note">Every finding quotes the line behind it</span>
+          </div>
+          <ol class="checks" id="checks"></ol>
+        </section>
+
+        <aside class="aside" aria-label="Supporting detail">
+          <section class="card side" aria-labelledby="signals-title">
+            <h2 id="signals-title">Signals</h2>
+            <div class="sigs" id="signals"></div>
+          </section>
+
+          <section class="card side" id="route" aria-labelledby="route-title" hidden>
+            <h2 id="route-title">Route taken</h2>
+            <p class="sec-note" id="route-summary"></p>
+            <ol class="hops" id="hops"></ol>
+          </section>
+        </aside>
+      </div>
+
+      <details class="card raw" id="raw">
+        <summary>
+          <span>Raw headers <span class="raw-count" id="raw-count"></span></span>
+          <span class="raw-tools">
+            <button class="btn btn--ghost btn--sm" type="button" id="raw-copy">Copy</button>
+          </span>
+        </summary>
+        <div class="raw-body" id="raw-body"></div>
+      </details>
+
+    </section>
+  </div>
+
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <div class="limits">
+        <h2>What this can't tell you</h2>
+        <ul>
+          <li>It reads headers, not content. Links, attachments and the body are never inspected.</li>
+          <li>Authentication that passes proves a domain sent the message — not that the domain is honest, or that the account behind it wasn't stolen.</li>
+          <li>Whoever assembled the message can write most of these lines by hand. A clean report is not a clean email.</li>
+        </ul>
+      </div>
+      <div class="colophon">
+        <p>Mailroom runs entirely in your browser. No server, no account, no log of what you paste.</p>
+        <p>Built by <a href="#">your name here</a>. Source on <a href="#">GitHub</a>.</p>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<noscript>
+  <p class="wrap" style="padding:16px 20px">Mailroom needs JavaScript to read headers. Nothing is sent anywhere.</p>
+</noscript>
+
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ *
+   * Reference data
+   * ------------------------------------------------------------------ */
+
+  var BRANDS = [
+    "paypal","microsoft","apple","google","amazon","netflix","dhl","fedex","ups",
+    "hsbc","barclays","natwest","lloyds","coinbase","binance","outlook","dropbox",
+    "linkedin","instagram","facebook","docusign","adobe","hmrc","irs","spotify",
+    "icloud","steam","usps","royalmail","santander","revolut","wise","booking"
+  ];
+
+  // Characters that look like Latin letters in other alphabets, plus digit swaps.
+  var HOMOGLYPH = {
+    "\u0430":"a","\u0435":"e","\u043e":"o","\u0440":"p","\u0441":"c","\u0445":"x",
+    "\u0443":"y","\u0456":"i","\u0458":"j","\u0455":"s","\u0501":"d","\u0261":"g",
+    "\u03bd":"v","\u03bf":"o","\u03b1":"a","\u03c1":"p","\u03c4":"t","\u0131":"i",
+    "0":"o","1":"l","3":"e","5":"s","4":"a","7":"t","8":"b"
+  };
+
+  var SAMPLES = {
+    suspicious: [
+      'Return-Path: <bounce@mail-relay-04.top>',
+      'Received: from mx.example-recipient.org (mx.example-recipient.org [192.0.2.10])',
+      '        by inbox.example-recipient.org with LMTP id 4f2a',
+      '        for <you@example-recipient.org>;',
+      '        Tue, 24 Feb 2026 14:07:52 +0000 (UTC)',
+      'Received: from mail-sor-f41.google.com (mail-sor-f41.google.com [209.85.220.41])',
+      '        by mx.example-recipient.org with ESMTPS id abc123',
+      '        for <you@example-recipient.org>;',
+      '        Tue, 24 Feb 2026 14:07:49 +0000 (UTC)',
+      'Received: from smtp.eastmail-campaign.net (smtp.eastmail-campaign.net [185.234.72.19])',
+      '        by mail-sor-f41.google.com with ESMTPS id 8f2c',
+      '        for <you@example-recipient.org>;',
+      '        Tue, 24 Feb 2026 14:06:11 +0000',
+      'Authentication-Results: mx.example-recipient.org;',
+      '       spf=fail (example-recipient.org: domain of bounce@mail-relay-04.top does not designate 185.234.72.19 as permitted sender) smtp.mailfrom=bounce@mail-relay-04.top;',
+      '       dkim=none;',
+      '       dmarc=fail (p=REJECT sp=REJECT dis=NONE) header.from=paypa1.com',
+      'From: "PayPal Service" <secure@paypa1.com>',
+      'Reply-To: refunds@mail-relay-04.top',
+      'To: you@example-recipient.org',
+      'Subject: Your account has been limited',
+      'Date: Tue, 24 Feb 2026 14:06:05 +0000',
+      'Message-ID: <20260224140605.8f2c@mail-relay-04.top>',
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset="UTF-8"'
+    ].join("\n"),
+
+    clean: [
+      'Return-Path: <newsletter@mail.example.org>',
+      'Received: from mx.example-recipient.org (mx.example-recipient.org [192.0.2.10])',
+      '        by inbox.example-recipient.org with LMTP id 71bd',
+      '        for <you@example-recipient.org>;',
+      '        Wed, 25 Feb 2026 09:14:31 +0000',
+      'Received: from mail.example.org (mail.example.org [198.51.100.24])',
+      '        by mx.example-recipient.org with ESMTPS id 7k2a',
+      '        for <you@example-recipient.org>;',
+      '        Wed, 25 Feb 2026 09:14:29 +0000',
+      'Received: from batch.example.org (batch.example.org [198.51.100.31])',
+      '        by mail.example.org with ESMTPS id 9d14',
+      '        for <you@example-recipient.org>;',
+      '        Wed, 25 Feb 2026 09:14:21 +0000',
+      'Authentication-Results: mx.example-recipient.org;',
+      '       spf=pass (example.org designates 198.51.100.24 as permitted sender) smtp.mailfrom=newsletter@mail.example.org;',
+      '       dkim=pass (2048-bit key) header.d=example.org header.s=selector1 header.b="Xk2pQ9wA";',
+      '       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=example.org',
+      'DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.org; s=selector1;',
+      '        h=from:to:subject:date:message-id; bh=abc123def456; b=Zm9vYmFy',
+      'From: "Example Weekly" <newsletter@example.org>',
+      'To: you@example-recipient.org',
+      'Subject: The February roundup',
+      'Date: Wed, 25 Feb 2026 09:14:18 +0000',
+      'Message-ID: <20260225091418.9d14@mail.example.org>',
+      'List-Unsubscribe: <https://example.org/unsubscribe>',
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset="UTF-8"'
+    ].join("\n")
+  };
+
+  var TWO_LEVEL = {
+    "co.uk":1,"org.uk":1,"ac.uk":1,"gov.uk":1,"co.nz":1,"com.au":1,"net.au":1,
+    "co.jp":1,"co.in":1,"com.br":1,"co.za":1,"com.sg":1,"com.mx":1,"co.il":1
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Small helpers
+   * ------------------------------------------------------------------ */
+
+  function $(sel, root) { return (root || document).querySelector(sel); }
+
+  function el(tag, props) {
+    var node = document.createElement(tag);
+    var kids = Array.prototype.slice.call(arguments, 2);
+    if (props) {
+      Object.keys(props).forEach(function (key) {
+        var value = props[key];
+        if (value === null || value === undefined || value === false) return;
+        if (key === "class") node.className = value;
+        else if (key === "text") node.textContent = value;
+        else node.setAttribute(key, value);
+      });
+    }
+    kids.forEach(function (kid) {
+      if (kid === null || kid === undefined) return;
+      node.append(kid);
+    });
+    return node;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Header parsing
+   * ------------------------------------------------------------------ */
+
+  // Turns a pasted block into [{name, value, raw}], unfolding continuation lines.
+  function parseHeaders(raw) {
+    var text = raw.replace(/\r\n?/g, "\n");
+    var block = text.split("\n\n")[0];
+    var out = [];
+
+    block.split("\n").forEach(function (line) {
+      if (/^[ \t]/.test(line) && out.length) {
+        var last = out[out.length - 1];
+        last.value += " " + line.trim();
+        last.raw += "\n" + line;
+        return;
+      }
+      var match = line.match(/^([^:\s][^:]*):[ \t]?([\s\S]*)$/);
+      if (!match) return;
+      out.push({
+        name: match[1].toLowerCase(),
+        value: match[2].trim(),
+        raw: line
+      });
+    });
+
+    return out;
+  }
+
+  function first(headers, name) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i].name === name) return headers[i].value;
+    }
+    return "";
+  }
+
+  function all(headers, name) {
+    return headers.filter(function (h) { return h.name === name; });
+  }
+
+  // Pulls the address and display name out of a From / Return-Path / Reply-To value.
+  function address(value) {
+    var result = { raw: value || "", email: "", domain: "", name: "" };
+    if (!value) return result;
+
+    var angle = value.match(/<([^>]+)>/);
+    var email = angle ? angle[1] : value.split(/[,;]/)[0];
+    email = email.trim().replace(/^mailto:/i, "").replace(/[)>.,;"']+$/, "");
+
+    result.email = email;
+    if (email.indexOf("@") > -1) {
+      result.domain = email.split("@").pop().trim().toLowerCase();
+    }
+    if (angle) {
+      result.name = value.slice(0, angle.index).trim().replace(/^"|"$/g, "");
+    }
+    return result;
+  }
+
+  // The domain you would actually have to own: example.co.uk, not a.b.example.co.uk
+  function registrable(domain) {
+    var parts = (domain || "").split(".").filter(Boolean);
+    if (parts.length <= 2) return parts.join(".");
+    var lastTwo = parts.slice(-2).join(".");
+    return TWO_LEVEL[lastTwo] ? parts.slice(-3).join(".") : lastTwo;
+  }
+
+  // Pulls apart a single Received header.
+  function parseReceived(header) {
+    var value = header.value;
+    var semi = value.lastIndexOf(";");
+    var head = semi === -1 ? value : value.slice(0, semi);
+    var rawDate = semi === -1 ? "" : value.slice(semi + 1).trim();
+    var cleanDate = rawDate.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+
+    var fromMatch = head.match(/\bfrom\s+([^\s;()]+)(?:\s*\(([^)]*)\))?/i);
+    var byMatch = head.match(/\bby\s+([^\s;()]+)/i);
+    var withMatch = head.match(/\bwith\s+([A-Za-z0-9._-]+)/i);
+    var ipMatch = head.match(/\[([0-9a-fA-F:.]{3,})\]/);
+
+    return {
+      raw: header.raw,
+      from: fromMatch ? fromMatch[1] : "",
+      by: byMatch ? byMatch[1] : "",
+      proto: withMatch ? withMatch[1] : "",
+      ip: ipMatch ? ipMatch[1] : "",
+      date: rawDate,
+      time: cleanDate ? Date.parse(cleanDate) : NaN
+    };
+  }
+
+  // Reads spf/dkim/dmarc out of Authentication-Results, topmost header first.
+  function parseAuth(headers) {
+    var result = { spf: "", dkim: "", dmarc: "", headerFrom: "", lines: [] };
+    var found = false;
+
+    all(headers, "authentication-results").forEach(function (header) {
+      result.lines.push(header.raw);
+      if (found) return;
+      found = true;
+      ["spf", "dkim", "dmarc"].forEach(function (mech) {
+        var match = header.value.match(new RegExp("(?:^|[\\s;])" + mech + "\\s*=\\s*([a-z]+)", "i"));
+        if (match) result[mech] = match[1].toLowerCase();
+      });
+      var headerFrom = header.value.match(/header\.from\s*=\s*([^\s;]+)/i);
+      if (headerFrom) result.headerFrom = headerFrom[1].toLowerCase();
+    });
+
+    // Some receivers put the SPF verdict in its own header instead.
+    var receivedSpf = first(headers, "received-spf");
+    if (!result.spf && receivedSpf) {
+      var spfMatch = receivedSpf.match(/^\s*([a-z]+)/i);
+      if (spfMatch) result.spf = spfMatch[1].toLowerCase();
+      result.lines.push("Received-SPF: " + receivedSpf);
+    }
+
+    result.present = result.lines.length > 0;
+    return result;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Lookalike domains
+   * ------------------------------------------------------------------ */
+
+  function fold(text) {
+    return String(text).split("").map(function (ch) {
+      return HOMOGLYPH[ch] || ch;
+    }).join("").replace(/-/g, "");
+  }
+
+  function editDistance(a, b) {
+    if (a === b) return 0;
+    var m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    var prev = [], cur, i, j;
+    for (j = 0; j <= n; j++) prev[j] = j;
+    for (i = 1; i <= m; i++) {
+      cur = [i];
+      for (j = 1; j <= n; j++) {
+        cur[j] = Math.min(
+          prev[j] + 1,
+          cur[j - 1] + 1,
+          prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)
+        );
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  // Returns {kind, brand} when a domain is imitating a known brand.
+  function lookalike(domain) {
+    if (!domain) return null;
+    var reg = registrable(domain);
+    var parts = reg.split(".");
+    var label = parts[0] || "";
+    var folded = fold(label);
+
+    // 1. The brand is a subdomain of something unrelated: paypal.com.secure-login.top
+    var labels = domain.split(".");
+    if (labels.length > 2) {
+      for (var i = 0; i < labels.length - 1; i++) {
+        if (BRANDS.indexOf(fold(labels[i])) > -1) {
+          return { kind: "subdomain", brand: fold(labels[i]) };
+        }
+      }
+    }
+
+    // 2. The label should read as a brand but doesn't, character for character.
+    if (BRANDS.indexOf(folded) > -1 && folded !== label) {
+      return { kind: "homoglyph", brand: folded };
+    }
+
+    // 3. Every other real brand, plus one-character-off names.
+    for (var b = 0; b < BRANDS.length; b++) {
+      var brand = BRANDS[b];
+      if (label === brand) return null;
+      if (label.length >= 5 && editDistance(folded, brand) === 1) {
+        return { kind: "near", brand: brand };
+      }
+    }
+    return null;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Formatting
+   * ------------------------------------------------------------------ */
+
+  function fmtTime(time) {
+    if (!time) return "time not given";
+    var iso = new Date(time).toISOString();
+    return iso.slice(0, 10) + " " + iso.slice(11, 16) + " UTC";
+  }
+
+  function fmtDuration(ms) {
+    if (!isFinite(ms)) return "unknown";
+    var s = Math.round(ms / 1000);
+    if (s < 1) return "under a second";
+    if (s < 60) return s + "s";
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + "m " + (s % 60) + "s";
+    var h = Math.floor(m / 60);
+    return h + "h " + (m % 60) + "m";
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The checks
+   * ------------------------------------------------------------------ */
+
+  var STATE_LABEL = { fail: "Contradiction", check: "Can't confirm", pass: "Confirmed" };
+  var STATE_ORDER = { fail: 0, check: 1, pass: 2 };
+
+  function buildChecks(headers) {
+    var checks = [];
+    var from = address(first(headers, "from"));
+    var returnPath = address(first(headers, "return-path"));
+    var replyTo = address(first(headers, "reply-to"));
+    var auth = parseAuth(headers);
+    var messageId = first(headers, "message-id");
+    var messageIdDomain = messageId ? (messageId.match(/@([^>\s]+)/) || [])[1] || "" : "";
+    var hasDkimSignature = all(headers, "dkim-signature").length > 0;
+
+    /* 1. The two return addresses */
+    if (!from.domain) {
+      checks.push({
+        state: "check",
+        title: "No sender address to compare",
+        why: "This block has no usable From line, so there is nothing to check the envelope against.",
+        evidence: [{ label: "From", raw: first(headers, "from") || "not present" }]
+      });
+    } else if (!returnPath.domain) {
+      checks.push({
+        state: "check",
+        title: "The envelope sender is missing",
+        why: "There is no Return-Path, so the second address isn't available. Clients are allowed to strip it, but it removes the cheapest cross-check you have.",
+        evidence: [{ label: "From", raw: first(headers, "from") }]
+      });
+    } else if (registrable(from.domain) === registrable(returnPath.domain)) {
+      checks.push({
+        state: "pass",
+        title: "The envelope matches the letterhead",
+        why: "The address shown to you and the address bounces go to are both on " + registrable(from.domain) + ".",
+        evidence: [
+          { label: "From", raw: first(headers, "from") },
+          { label: "Return-Path", raw: first(headers, "return-path") }
+        ]
+      });
+    } else {
+      checks.push({
+        state: "fail",
+        title: "It returns to a different organisation",
+        why: "The message says it is from " + registrable(from.domain) + ", but the envelope belongs to " + registrable(returnPath.domain) + ". One of those two addresses is the truth about who sent it.",
+        evidence: [
+          { label: "From", raw: first(headers, "from") },
+          { label: "Return-Path", raw: first(headers, "return-path") }
+        ]
+      });
+    }
+
+    /* 2. Who vouched for it */
+    var mechanisms = ["spf", "dkim", "dmarc"].filter(function (m) { return auth[m]; });
+    var bad = mechanisms.filter(function (m) {
+      return ["fail", "softfail", "permerror", "temperror"].indexOf(auth[m]) > -1;
+    });
+
+    if (!auth.present) {
+      checks.push({
+        state: "check",
+        title: "Nothing vouches for the sender",
+        why: "There is no Authentication-Results header, so no receiver recorded whether SPF, DKIM or DMARC passed. Some clients drop this header when forwarding.",
+        evidence: [
+          { label: "Looked for", raw: "Authentication-Results: …\nReceived-SPF: …" },
+          { label: "DKIM-Signature present", raw: hasDkimSignature ? "yes" : "no" }
+        ]
+      });
+    } else if (bad.length) {
+      checks.push({
+        state: "fail",
+        title: "The sender's own claims were rejected",
+        why: "The receiving server recorded " + bad.map(function (m) {
+          return m.toUpperCase() + " " + auth[m];
+        }).join(", ") + ". Whatever the display name says, the infrastructure did not back it up.",
+        evidence: auth.lines.map(function (raw) { return { label: "Authentication-Results", raw: raw }; })
+      });
+    } else if (mechanisms.length < 3) {
+      checks.push({
+        state: "check",
+        title: "Only part of the message was authenticated",
+        why: "Mailroom found " + mechanisms.map(function (m) {
+          return m.toUpperCase() + " " + auth[m];
+        }).join(" and ") + ", with no result for the rest. That is common and not automatically bad, but it is not a full picture.",
+        evidence: auth.lines.map(function (raw) { return { label: "Authentication-Results", raw: raw }; })
+      });
+    } else {
+      checks.push({
+        state: "pass",
+        title: "SPF, DKIM and DMARC all passed",
+        why: "Three separate mechanisms agree the message came from infrastructure that " +
+          (registrable(auth.headerFrom || from.domain) || "the sender") + " authorised.",
+        evidence: auth.lines.map(function (raw) { return { label: "Authentication-Results", raw: raw }; })
+      });
+    }
+
+    /* 3. Replies going elsewhere */
+    if (replyTo.domain && from.domain && registrable(replyTo.domain) !== registrable(from.domain)) {
+      checks.push({
+        state: "check",
+        title: "Replies would go to a different domain",
+        why: "Reply-To points at " + registrable(replyTo.domain) + " instead of " + registrable(from.domain) + ". Mailing lists and help desks do this legitimately. It matters most when the rest of the message is already failing.",
+        evidence: [
+          { label: "Reply-To", raw: first(headers, "reply-to") },
+          { label: "From", raw: first(headers, "from") }
+        ]
+      });
+    }
+
+    /* 4. Does the sender's domain imitate a brand? */
+    var spoof = lookalike(from.domain);
+    if (spoof && spoof.kind === "subdomain") {
+      checks.push({
+        state: "fail",
+        title: "A known name is being used as a subdomain",
+        why: "The domain " + from.domain + " contains \u201c" + spoof.brand + "\u201d, but the part someone actually owns is " +
+          registrable(from.domain) + ". Everything to the left of that can be invented by whoever registers the domain.",
+        evidence: [{ label: "From", raw: first(headers, "from") }]
+      });
+    } else if (spoof && spoof.kind === "homoglyph") {
+      checks.push({
+        state: "fail",
+        title: "The domain copies \u201c" + spoof.brand + "\u201d with different characters",
+        why: "Once lookalike characters and digits are normalised, " + from.domain + " reads as " +
+          spoof.brand + ". The domain is not the brand's; it is built to survive a quick glance.",
+        evidence: [{ label: "From", raw: first(headers, "from") }]
+      });
+    } else if (spoof && spoof.kind === "near") {
+      checks.push({
+        state: "check",
+        title: "The domain is one character away from " + spoof.brand,
+        why: from.domain + " is a single edit away from " + spoof.brand + ". This can be a coincidence, a regional domain, or a typo trap \u2014 check it against the address you already have on file.",
+        evidence: [{ label: "From", raw: first(headers, "from") }]
+      });
+    } else {
+      checks.push({
+        state: "pass",
+        title: "The domain doesn't imitate a well-known brand",
+        why: "Mailroom compared " + (registrable(from.domain) || "the sender domain") +
+          " against a short list of commonly spoofed names, including digit and character swaps. That list is not everything.",
+        evidence: [{ label: "From", raw: first(headers, "from") }]
+      });
+    }
+
+    /* 5. Message-ID minted elsewhere */
+    if (messageIdDomain && from.domain && registrable(messageIdDomain) !== registrable(from.domain)) {
+      checks.push({
+        state: "check",
+        title: "The message was stamped by another domain",
+        why: "The Message-ID was issued by " + registrable(messageIdDomain) + ", not " + registrable(from.domain) +
+          ". Sending platforms do this on behalf of their customers, so on its own it proves nothing.",
+        evidence: [{ label: "Message-ID", raw: first(headers, "message-id") }]
+      });
+    }
+
+    /* 6. Does the route make chronological sense? */
+    var hops = all(headers, "received").map(parseReceived).reverse();
+    var timed = hops.filter(function (h) { return isFinite(h.time); });
+    if (timed.length >= 2) {
+      var backwards = [];
+      for (var i = 1; i < timed.length; i++) {
+        if (timed[i].time < timed[i - 1].time) backwards.push(timed[i]);
+      }
+      checks.push({
+        state: backwards.length ? "check" : "pass",
+        title: backwards.length ? "The timestamps run backwards" : "The route is in chronological order",
+        why: backwards.length
+          ? "At least one server claims to have received the message before the server before it sent it. Clocks drift, but this is also what hand-edited headers look like."
+          : "Every hop arrives after the one before it, and the whole journey took " +
+            fmtDuration(timed[timed.length - 1].time - timed[0].time) + ".",
+        evidence: timed.map(function (h) {
+          return { label: "Received", raw: h.raw };
+        })
+      });
+    }
+
+    return {
+      checks: checks,
+      from: from,
+      returnPath: returnPath,
+      replyTo: replyTo,
+      auth: auth,
+      messageIdDomain: messageIdDomain,
+      date: first(headers, "date"),
+      hops: hops
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Rendering
+   * ------------------------------------------------------------------ */
+
+  var RESULT_TOKEN = /((?:spf|dkim|dmarc)=(?:pass|fail|softfail|none|neutral|temperror|permerror))/gi;
+  var RESULT_ONLY = /^(spf|dkim|dmarc)=(pass|fail|softfail|none|neutral|temperror|permerror)$/i;
+
+  var currentRaw = "";
+
+  function toneOfAuth(value) {
+    if (!value) return "none";
+    if (value === "pass") return "pass";
+    if (["fail", "softfail", "permerror", "temperror"].indexOf(value) > -1) return "fail";
+    if (["none", "neutral"].indexOf(value) > -1) return "check";
+    return "check";
+  }
+
+  function tagFor(state) {
+    return el("span", { class: "tag", text: STATE_LABEL[state] });
+  }
+
+  /* ---------- signals ---------- */
+
+  function signal(name, value, tone) {
+    var node = el("span", { class: "sig", "data-state": tone, "data-tone": tone });
+    node.append(el("i", { text: name }));
+    node.append(el("b", { text: value }));
+    return node;
+  }
+
+  function renderSignals(data) {
+    var host = $("#signals");
+    host.textContent = "";
+
+    var auth = data.auth || {};
+    var fromReg = registrable(data.from.domain);
+    var rpReg = registrable(data.returnPath.domain);
+
+    ["spf", "dkim", "dmarc"].forEach(function (key) {
+      var value = auth[key];
+      host.append(signal(
+        key,
+        value || "not recorded",
+        toneOfAuth(value)
+      ));
+    });
+
+    var alignTone = !fromReg || !rpReg ? "none" : (fromReg === rpReg ? "pass" : "fail");
+    host.append(signal(
+      "align",
+      alignTone === "none" ? "unknown" : (alignTone === "pass" ? "match" : "mismatch"),
+      alignTone
+    ));
+
+    var timed = (data.hops || []).filter(function (hop) { return isFinite(hop.time); });
+    var routeTone = "none";
+    if (timed.length >= 2) {
+      routeTone = "pass";
+      for (var i = 1; i < timed.length; i++) {
+        if (timed[i].time < timed[i - 1].time) routeTone = "check";
+      }
+    }
+    host.append(signal(
+      "route",
+      routeTone === "none" ? "no stamps" : (routeTone === "pass" ? "ordered" : "backwards"),
+      routeTone
+    ));
+  }
+
+  /* ---------- counts ---------- */
+
+  function renderCounts(counts) {
+    var host = $("#verdict-counts");
+    host.textContent = "";
+
+    var spec = [
+      { state: "fail", word: function (n) { return n === 1 ? "contradiction" : "contradictions"; } },
+      { state: "check", word: function () { return "unconfirmed"; } },
+      { state: "pass", word: function () { return "confirmed"; } }
+    ];
+
+    spec.forEach(function (part) {
+      var n = counts[part.state];
+      if (!n) return;
+      var node = el("span", { class: "vc", "data-state": part.state });
+      node.append(el("b", { text: String(n) }));
+      node.append(document.createTextNode(" " + part.word(n)));
+      host.append(node);
+    });
+  }
+
+  /* ---------- findings ---------- */
+
+  function renderCheck(check, index) {
+    var item = el("li", { class: "finding", "data-state": check.state });
+    item.style.setProperty("--i", String(index || 0));
+
+    var head = el("div", { class: "finding-head" });
+    head.append(el("span", { class: "dot", "aria-hidden": "true" }));
+    head.append(el("h3", { text: check.title }));
+    head.append(tagFor(check.state));
+    item.append(head);
+
+    item.append(el("p", { class: "finding-why", text: check.why }));
+
+    if (check.evidence && check.evidence.length) {
+      var details = el("details", { class: "ev" });
+      details.append(el("summary", {
+        text: check.evidence.length === 1
+          ? "Show the line it read"
+          : "Show the " + check.evidence.length + " lines it read"
+      }));
+
+      check.evidence.forEach(function (piece) {
+        var quote = el("pre");
+        quote.append(el("span", { class: "ev-k", text: piece.label }));
+        quote.append(document.createTextNode(": "));
+        quote.append(document.createTextNode(piece.raw || "not present"));
+        details.append(quote);
+      });
+
+      item.append(details);
+    }
+
+    return item;
+  }
+
+  /* ---------- identity ---------- */
+
+  function identityColumn(key, value, note) {
+    var col = el("div", { class: "id-col" });
+    col.append(el("span", { class: "id-key", text: key }));
+    col.append(el("div", { class: "id-addr", text: value || "not given" }));
+    col.append(el("p", { class: "id-note", text: note }));
+    return col;
+  }
+
+  function renderIdentity(data) {
+    var grid = $("#identity");
+    var summary = $("#id-sum");
+    var previousExtra = grid.parentNode.querySelector(".id-extra");
+    if (previousExtra) previousExtra.remove();
+    grid.textContent = "";
+    summary.textContent = "";
+
+    var fromReg = registrable(data.from.domain);
+    var rpReg = registrable(data.returnPath.domain);
+
+    var state = !fromReg || !rpReg ? "check" : (fromReg === rpReg ? "pass" : "fail");
+
+    var fromNote = data.from.name
+      ? "the name on the letterhead"
+      : "the letterhead";
+
+    grid.append(identityColumn("What you see", data.from.email, fromNote));
+    grid.append(identityColumn("Where it bounces", data.returnPath.email, "the envelope"));
+
+    var bridge = el("span", {
+      class: "id-bridge",
+      "data-state": state,
+      "aria-hidden": "true",
+      text: state === "pass" ? "=" : state === "fail" ? "\u2260" : "?"
+    });
+    grid.append(bridge);
+
+    var lead = el("b", {
+      text: state === "pass"
+        ? "Same organisation on both addresses."
+        : state === "fail"
+          ? "Different organisations."
+          : "Not enough addresses to compare."
+    });
+    summary.append(lead);
+
+    if (state === "pass") {
+      summary.append(el("span", { text: "Both resolve to " + fromReg + "." }));
+    } else if (state === "fail") {
+      summary.append(el("span", { text: fromReg + " claims to send it; " + rpReg + " receives the bounces." }));
+    } else {
+      summary.append(el("span", { text: "A From and a Return-Path are both needed for the cross-check." }));
+    }
+
+    var extras = el("div", { class: "id-extra" });
+    var any = false;
+
+    if (data.replyTo && data.replyTo.domain) {
+      var sameReply = registrable(data.replyTo.domain) === fromReg;
+      var reply = el("span");
+      reply.append(document.createTextNode("Replies go to "));
+      reply.append(el("code", { text: data.replyTo.email }));
+      if (!sameReply) reply.append(document.createTextNode(" — a different domain"));
+      extras.append(reply);
+      any = true;
+    }
+
+    if (data.messageIdDomain && data.from.domain &&
+        registrable(data.messageIdDomain) !== fromReg) {
+      var stamp = el("span");
+      stamp.append(document.createTextNode("Message-ID issued by "));
+      stamp.append(el("code", { text: registrable(data.messageIdDomain) }));
+      extras.append(stamp);
+      any = true;
+    }
+
+    var origin = (data.hops || [])[0];
+    if (origin && origin.ip) {
+      var ip = el("span");
+      ip.append(document.createTextNode("First hop "));
+      ip.append(el("code", { text: origin.ip }));
+      extras.append(ip);
+      any = true;
+    }
+
+    if (any) grid.parentNode.insertBefore(extras, summary);
+  }
+
+  /* ---------- route ---------- */
+
+  function renderRoute(data) {
+    var route = $("#route");
+    var list = $("#hops");
+    var summary = $("#route-summary");
+    var hops = data.hops || [];
+
+    list.textContent = "";
+    summary.textContent = "";
+
+    if (!hops.length) {
+      route.hidden = true;
+      return;
+    }
+    route.hidden = false;
+
+    var timed = hops.filter(function (hop) { return isFinite(hop.time); });
+    var first = hops[0];
+    var last = hops[hops.length - 1];
+
+    var bits = [hops.length + (hops.length === 1 ? " hop" : " hops")];
+    if (timed.length >= 2) {
+      bits.push(fmtDuration(timed[timed.length - 1].time - timed[0].time) + " in transit");
+    }
+
+    var originHost = (first.from && first.from !== "unknown")
+      ? first.from
+      : (first.ip || "an unnamed host");
+
+    summary.textContent = bits.join(", ") + ". Entered the network at " + originHost +
+      (last.by ? ", last handed to " + last.by : "") + ".";
+
+    hops.forEach(function (hop, index) {
+      var delta = "origin";
+      if (index > 0) {
+        var previous = hops[index - 1];
+        delta = (isFinite(hop.time) && isFinite(previous.time))
+          ? "+" + fmtDuration(hop.time - previous.time)
+          : "no stamp";
+      }
+
+      var host = (hop.from && hop.from !== "unknown")
+        ? hop.from
+        : (hop.ip || "unnamed host");
+
+      var meta = [];
+      if (hop.ip && hop.ip !== host) meta.push(hop.ip);
+      if (hop.by) meta.push("received by " + hop.by + (hop.proto ? " over " + hop.proto : ""));
+      meta.push(fmtTime(hop.time));
+
+      var li = el("li", { class: "hop" });
+      li.append(el("span", { class: "hop-n", "aria-hidden": "true", text: String(index + 1) }));
+
+      var line = el("div", { class: "hop-line" });
+      line.append(el("span", { class: "hop-host", text: host }));
+      line.append(el("span", { class: "hop-delta", text: delta }));
+      li.append(line);
+
+      li.append(el("p", { class: "hop-meta", text: meta.join(", ") }));
+      list.append(li);
+    });
+  }
+
+  /* ---------- raw headers ---------- */
+
+  function highlight(value) {
+    var frag = document.createDocumentFragment();
+    String(value).split(RESULT_TOKEN).forEach(function (part) {
+      var match = part.match(RESULT_ONLY);
+      if (!match) {
+        frag.append(document.createTextNode(part));
+        return;
+      }
+      var tone = toneOfAuth(match[2].toLowerCase());
+      frag.append(el("span", {
+        class: "hl",
+        "data-tone": tone === "none" ? "check" : tone,
+        text: part
+      }));
+    });
+    return frag;
+  }
+
+  function rawLine(line, index) {
+    var row = el("div", { class: "raw-line" });
+    row.append(el("span", { class: "raw-n", "aria-hidden": "true", text: String(index + 1) }));
+
+    var body = el("span", { class: "raw-t" });
+    var match = line.match(/^([A-Za-z][A-Za-z0-9-]*):[ \t]?(.*)$/);
+
+    if (!match) {
+      // Folded continuation lines carry the SPF/DKIM/DMARC verdicts, so they get the
+      // same treatment as a normal value.
+      body.append(highlight(line || " "));
+    } else {
+      body.append(el("span", { class: "raw-k", text: match[1] }));
+      body.append(el("span", { class: "raw-c", text: ": " }));
+      body.append(highlight(match[2]));
+    }
+
+    row.append(body);
+    return row;
+  }
+
+  function renderRaw(raw) {
+    var host = $("#raw-body");
+    var count = $("#raw-count");
+
+    var text = String(raw || "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+    var lines = text.split("\n");
+
+    host.textContent = "";
+    lines.forEach(function (line, index) {
+      host.append(rawLine(line, index));
+    });
+
+    count.textContent = lines.length + " lines";
+    currentRaw = text;
+  }
+
+  /* ---------- report ---------- */
+
+  function readableDate(value) {
+    if (!value) return "no Date header";
+    var when = new Date(String(value).replace(/\([^)]*\)/g, " "));
+    if (isNaN(when.getTime())) return "unreadable Date";
+    var iso = when.toISOString();
+    return iso.slice(0, 10) + " " + iso.slice(11, 16) + " UTC";
+  }
+
+  function render(data, raw) {
+    var checks = data.checks;
+    var counts = { fail: 0, check: 0, pass: 0 };
+    checks.forEach(function (check) { counts[check.state]++; });
+
+    var verdict = counts.fail
+      ? {
+          state: "fail",
+          pill: counts.fail + (counts.fail === 1 ? " contradiction" : " contradictions"),
+          title: "Two identities, one message",
+          text: "The sender name and the route tell different stories. Every contradiction below is quoted from the headers, so you can check the work yourself before you act on the content."
+        }
+      : counts.check
+        ? {
+            state: "check",
+            pill: counts.check + (counts.check === 1 ? " open question" : " open questions"),
+            title: "Nothing is proven either way",
+            text: "Mailroom found no outright contradiction, but the message can't vouch for itself. Treat the sender as unconfirmed until something outside this message does."
+          }
+        : {
+            state: "pass",
+            pill: "no contradictions",
+            title: "Nothing contradicts the message",
+            text: "The envelope, the letterhead and the authentication agree with each other. That describes how it travelled, not what it is asking you to do."
+          };
+
+    var pill = $("#verdict-pill");
+    pill.setAttribute("data-state", verdict.state);
+    pill.textContent = verdict.pill;
+
+    $("#verdict").setAttribute("data-state", verdict.state);
+
+    $("#verdict-meta").textContent = readableDate(data.date);
+    $("#verdict-title").textContent = verdict.title;
+    $("#verdict-text").textContent = verdict.text;
+
+    renderCounts(counts);
+    renderSignals(data);
+    renderIdentity(data);
+
+    var list = $("#checks");
+    list.textContent = "";
+    checks
+      .slice()
+      .sort(function (a, b) { return STATE_ORDER[a.state] - STATE_ORDER[b.state]; })
+      .forEach(function (check, index) { list.append(renderCheck(check, index)); });
+
+    renderRoute(data);
+    renderRaw(raw);
+
+    var report = $("#report");
+    report.hidden = false;
+    report.classList.remove("report--in");
+    void report.offsetWidth;
+    report.classList.add("report--in");
+
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    report.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    window.setTimeout(function () {
+      $("#verdict-title").focus({ preventScroll: true });
+    }, reduce ? 0 : 340);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Wiring
+   * ------------------------------------------------------------------ */
+
+  var headersField = $("#headers");
+  var errorField = $("#form-error");
+  var form = $("#intake-form");
+  var rawCopy = $("#raw-copy");
+
+  headersField.placeholder = [
+    "Return-Path: <bounce@mail-relay-04.top>",
+    "Authentication-Results: mx.example.org;",
+    "       spf=fail smtp.mailfrom=bounce@mail-relay-04.top;",
+    "       dmarc=fail header.from=paypa1.com",
+    "From: \"PayPal Service\" <secure@paypa1.com>",
+    ""
+  ].join("\n");
+
+  function copyText(text, button) {
+    var original = button.textContent;
+
+    function done(ok) {
+      button.textContent = ok ? "Copied" : "Copy failed";
+      window.setTimeout(function () { button.textContent = original; }, 1600);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); },
+        function () { done(false); });
+      return;
+    }
+
+    var scratch = document.createElement("textarea");
+    scratch.value = text;
+    scratch.setAttribute("readonly", "");
+    scratch.style.position = "fixed";
+    scratch.style.opacity = "0";
+    document.body.append(scratch);
+    scratch.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (error) { ok = false; }
+    scratch.remove();
+    done(ok);
+  }
+
+  function showError(message) {
+    errorField.textContent = message;
+    errorField.hidden = false;
+    headersField.focus();
+    $("#report").hidden = true;
+  }
+
+  // Returns the parsed headers, or null when the text isn't a usable header block.
+  function readableHeaders(raw) {
+    var headers = parseHeaders(raw);
+    var usable = headers.filter(function (header) {
+      return ["from", "received", "return-path", "authentication-results", "dkim-signature"]
+        .indexOf(header.name) > -1;
+    });
+    return headers.length >= 3 && usable.length ? headers : null;
+  }
+
+  function run() {
+    var raw = headersField.value.trim();
+    errorField.hidden = true;
+
+    var headers = readableHeaders(raw);
+
+    if (!headers) {
+      showError(raw
+        ? "That doesn't look like a header block. Start at the first line, which is usually \u201cReturn-Path:\u201d or \u201cReceived:\u201d, and paste through to the blank line before the body."
+        : "Paste the message headers first, or load one of the examples.");
+      return;
+    }
+
+    render(buildChecks(headers), raw);
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    run();
+  });
+
+  // Ctrl/Cmd + Enter inspects from anywhere in the form, including the textarea.
+  form.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      run();
+    }
+  });
+
+  var runKey = $("#run-key");
+  if (runKey && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || "")) {
+    runKey.textContent = "\u2318";
+  }
+
+  /* ---------- .eml files ---------- */
+
+  var fileInput = $("#eml-file");
+  var fileButton = $("#eml-open");
+  var loadedNote = $("#loaded");
+  var intakeCard = document.querySelector(".intake");
+  var MAX_FILE = 5 * 1024 * 1024;
+
+  function clearLoaded() {
+    loadedNote.hidden = true;
+    loadedNote.textContent = "";
+  }
+
+  function fileError(message) {
+    clearLoaded();
+    showError(message);
+  }
+
+  // A .eml is headers, one blank line, then the body. Keep the first part only.
+  function headerBlock(text) {
+    var normal = String(text || "").replace(/\r\n?/g, "\n").replace(/^\n+/, "");
+    var cut = normal.indexOf("\n\n");
+    if (cut > -1) normal = normal.slice(0, cut);
+    return normal.replace(/\s+$/, "");
+  }
+
+  function loadFile(file) {
+    if (!file) return;
+    errorField.hidden = true;
+
+    if (/\.msg$/i.test(file.name)) {
+      fileError("Outlook's .msg format isn't a plain text file, so Mailroom can't read it. In Outlook use File then Properties, and copy the internet headers instead.");
+      return;
+    }
+
+    if (file.size > MAX_FILE) {
+      fileError("\u201c" + file.name + "\u201d is " + (file.size / 1048576).toFixed(1) +
+        " MB. One message's headers are normally a few kilobytes \u2014 save just that message and try again.");
+      return;
+    }
+
+    file.text().then(function (text) {
+      var block = headerBlock(text);
+      headersField.value = block;
+
+      if (!readableHeaders(block)) {
+        fileError("\u201c" + file.name + "\u201d doesn't look like a single email. Save the message itself as .eml (or .txt) and drop that in.");
+        return;
+      }
+
+      run();
+
+      var lines = block.split("\n").length;
+      loadedNote.textContent = "";
+      loadedNote.append(el("span", { text: "\u201c" + file.name + "\u201d \u2014 " }));
+      loadedNote.append(el("b", { text: lines + (lines === 1 ? " header line" : " header lines") }));
+      loadedNote.append(document.createTextNode(", body ignored."));
+      loadedNote.hidden = false;
+    }).catch(function () {
+      fileError("That file couldn't be read as text. Try saving the message as .eml first.");
+    });
+  }
+
+  var dragDepth = 0;
+
+  function isFileDrag(event) {
+    var types = event.dataTransfer && event.dataTransfer.types;
+    if (!types) return false;
+    for (var i = 0; i < types.length; i++) {
+      if (types[i] === "Files") return true;
+    }
+    return false;
+  }
+
+  function setDragging(on) {
+    intakeCard.classList.toggle("is-dragging", on);
+  }
+
+  window.addEventListener("dragenter", function (event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    dragDepth++;
+    setDragging(true);
+  });
+
+  window.addEventListener("dragover", function (event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  });
+
+  window.addEventListener("dragleave", function (event) {
+    if (!isFileDrag(event)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) setDragging(false);
+  });
+
+  window.addEventListener("drop", function (event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    dragDepth = 0;
+    setDragging(false);
+    loadFile(event.dataTransfer.files && event.dataTransfer.files[0]);
+  });
+
+  window.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && dragDepth) {
+      dragDepth = 0;
+      setDragging(false);
+    }
+  });
+
+  fileButton.addEventListener("click", function () {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    loadFile(file);
+  });
+
+  headersField.addEventListener("input", clearLoaded);
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-sample]"), function (button) {
+    button.addEventListener("click", function () {
+      clearLoaded();
+      headersField.value = SAMPLES[button.getAttribute("data-sample")];
+      run();
+    });
+  });
+
+  rawCopy.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    copyText(currentRaw, rawCopy);
+  });
+})();
+</script>
+</body>
+</html>
